@@ -1,0 +1,24 @@
+{
+    "name": "understeam/lumen-doctrine-elasticsearch",
+    "description": "Lumen + Doctrine + Scout Elasticsearch integration",
+    "type": "library",
+    "require": {
+        "php": ">=7.2",
+        "laravel/scout": "^3.0",
+        "laravel-doctrine/orm": "^1.4",
+        "nordsoftware/lumen-elasticsearch": "^2.3"
+    },
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Anatoly Rugalev",
+            "email": "anatoly.rugalev@gmail.com"
+        }
+    ],
+    "minimum-stability": "dev",
+    "autoload": {
+        "psr-4": {
+            "Understeam\\LumenDoctrineElasticsearch\\": "src"
+        }
+    }
+}
