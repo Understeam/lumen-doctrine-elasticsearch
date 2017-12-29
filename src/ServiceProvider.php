@@ -18,7 +18,7 @@ use Understeam\LumenDoctrineElasticsearch\Definitions\DefinitionDispatcher;
 use Understeam\LumenDoctrineElasticsearch\Definitions\DefinitionDispatcherContract;
 use Understeam\LumenDoctrineElasticsearch\Engine\ElasticsearchEngine;
 use Understeam\LumenDoctrineElasticsearch\Engine\ElasticsearchEngineContract;
-use Understeam\LumenDoctrineElasticsearch\Migrations\Commands\MigrateCommand;
+use Understeam\LumenDoctrineElasticsearch\Migrations\Commands\MigrateAllCommand;
 
 /**
  * Class ServiceProvider
@@ -94,7 +94,7 @@ class ServiceProvider extends \Illuminate\Support\ServiceProvider
     protected function registerMigrations()
     {
         $this->commands([
-            MigrateCommand::class,
+            MigrateAllCommand::class,
         ]);
     }
 }

@@ -221,7 +221,7 @@ class ElasticsearchEngine extends Engine implements ElasticsearchEngineContract
 
     public function searchRaw($model, $query)
     {
-        // TODO: select definition
+        // TODO: select definition somehow
         $payload = $this->makeTypePayload(
             $this->makeIndexPayload($model->searchableAs()),
             $model->searchableAs()
@@ -238,7 +238,7 @@ class ElasticsearchEngine extends Engine implements ElasticsearchEngineContract
 
     public function map($results, $model)
     {
-        // TODO
+        // TODO map results to entities
     }
 
     public function getTotalCount($results)

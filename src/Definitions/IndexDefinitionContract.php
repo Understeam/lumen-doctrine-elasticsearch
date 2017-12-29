@@ -31,6 +31,11 @@ interface IndexDefinitionContract
 
     /**
      * Elasticsearch index settings
+     *
+     * Required options:
+     * - index.number_of_replicas
+     * - index.number_of_shards
+     * - index.refresh_interval
      * @return array
      */
     public function getSettings(): array;
