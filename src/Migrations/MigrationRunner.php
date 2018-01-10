@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace Understeam\LumenDoctrineElasticsearch\Migrations;
 
-use \stdClass;
+use Illuminate\Support\Arr;
 use Nord\Lumen\Elasticsearch\Contracts\ElasticsearchServiceContract;
 use Understeam\LumenDoctrineElasticsearch\Definitions\DefinitionDispatcherContract;
 use Understeam\LumenDoctrineElasticsearch\Definitions\IndexDefinitionContract;
@@ -24,10 +24,11 @@ class MigrationRunner
      */
     protected $es;
 
-    const STATE_NOT_MODIFIED = 'not-modified';
     const STATE_ABSENT = 'absent';
-    const STATE_SETTINGS_CHANGED = 'settings-changed';
+    const STATE_REIMPORT_REQUIRED = 'reimport-required';
     const STATE_REINDEX_REQUIRED = 'reindex-required';
+    const STATE_SETTINGS_UPDATE_REQUIRED = 'settings-update-required';
+    const STATE_NOT_MODIFIED = 'not-modified';
 
     /**
      * MigrationRunner constructor.
@@ -40,47 +41,284 @@ class MigrationRunner
         $this->es = $es;
     }
 
+    /**
+     * @return array|IndexDefinitionContract[]
+     */
+    public function getDefinitions()
+    {
+        return $this->definitions->getDefinitions();
+    }
+
     protected function getDefinitionBody(IndexDefinitionContract $definition)
     {
         return [
             'mappings' => [
-                $definition->getTypeName() => $definition->getMapping(),
+                $definition->getTypeName() => array_replace_recursive($definition->getMapping(), [
+                    '_meta' => $this->getMappingMeta($definition),
+                ]),
             ],
             'settings' => $definition->getSettings(),
         ];
     }
 
-    /**
-     * @deprecated
-     * @param IndexDefinitionContract $definition
-     * @return bool
-     */
-    protected function hasIndex(IndexDefinitionContract $definition)
+    protected function getMappingMeta(IndexDefinitionContract $definition)
     {
-        return $this->es->indices()->exists(['index' => $definition->getIndexName()]);
+        return [
+            // We need source data to detect whether it was changed
+            'definitionClass' => get_class($definition),
+            'entityClass' => $definition->getEntityClass(),
+            'mappings' => serialize($definition->getMapping()),
+            'settings' => serialize($definition->getSettings()),
+        ];
     }
 
     protected function indexSuffix(string $indexName): string
     {
-        return $indexName . '_' . time();
+        return $indexName . '_' . uniqid() . '_' . date('Y-m-d_H-i');
+    }
+
+    protected function getRealIndexName(string $alias)
+    {
+        /** @var array $data */
+        $data = $this->es->indices()->get(['index' => $alias]);
+        return Arr::first(array_keys($data));
+    }
+
+    public function getDefinitionState(IndexDefinitionContract $definition): string
+    {
+        $indices = $this->es->indices();
+        if (!$indices->exists(['index' => $definition->getIndexAlias()])) {
+            return self::STATE_ABSENT;
+        }
+        $realName = $this->getRealIndexName($definition->getIndexAlias());
+        $mapping = $this->es->indices()->getMapping([
+            'index' => $definition->getIndexAlias(),
+            'type' => $definition->getTypeName()
+        ]);
+
+        $meta = $mapping[$realName]['mappings'][$definition->getIndexAlias()]['_meta'];
+        $originalMappings = unserialize($meta['mappings']);
+        if ($originalMappings !== $definition->getMapping()) {
+            // Mapping was changed
+            return self::STATE_REIMPORT_REQUIRED;
+        }
+        $originalSettings = unserialize($meta['settings']);
+        if ($originalSettings !== $definition->getSettings()) {
+            if ($this->wasStaticSettingsChanged($originalSettings, $definition->getSettings())) {
+                // Static settings were changed
+                return self::STATE_REINDEX_REQUIRED;
+            } else {
+                // Only dynamic settings were changed
+                return self::STATE_SETTINGS_UPDATE_REQUIRED;
+            }
+        }
+
+        return self::STATE_NOT_MODIFIED;
     }
 
     /**
-     * @deprecated
-     * @param array $currentState
-     * @param array $expectedState
-     * @return bool
+     * Creates new index.
+     * @param IndexDefinitionContract $definition
+     * @return string
      */
-    protected function isIndexesEqual(array $currentState, array $expectedState): bool
+    public function createIndex(IndexDefinitionContract $definition): string
     {
-        // TODO: better difference analysis
-        $currentState = [
-            'mappings' => array_get($currentState, 'mappings', []),
-            'settings' => array_get($currentState, 'settings', []),
-        ];
-        $diff = static::arrayDiff($expectedState, $currentState);
-        return empty($diff);
+        $realIndexName = $this->indexSuffix($definition->getIndexAlias());
+        $this->es->indices()->create([
+            'index' => $realIndexName,
+            'body' => array_replace_recursive($this->getDefinitionBody($definition), [
+                'aliases' => [
+                    $definition->getIndexAlias() => new \stdClass(),
+                ],
+            ]),
+        ]);
+        return $realIndexName;
     }
+
+    /**
+     * Updates index settings
+     * @param IndexDefinitionContract $definition
+     */
+    public function updateSettings(IndexDefinitionContract $definition)
+    {
+        $settings = $definition->getSettings();
+        $settings = $this->filterStaticSettings($settings);
+        // Trying to update settings as given
+        $this->es->indices()->putSettings([
+            'index' => $definition->getIndexAlias(),
+            'body' => $settings,
+        ]);
+        $this->es->indices()->putMapping([
+            'index' => $definition->getIndexAlias(),
+            'type' => $definition->getTypeName(),
+            'body' => [
+                '_meta' => $this->getMappingMeta($definition),
+            ]
+        ]);
+    }
+
+    /**
+     * Recreates index and moves data into new index
+     * @param IndexDefinitionContract $definition
+     */
+    public function reindex(IndexDefinitionContract $definition)
+    {
+        $realIndexName = $this->indexSuffix($definition->getIndexAlias());
+        // 0. Retrieve real index name (not alias)
+        /** @var array $currentState */
+        $currentState = $this->es->indices()->get(['index' => $definition->getIndexAlias()]);
+        $oldIndexName = array_keys($currentState)[0];
+        // 1. Create new index without alias with temporary settings to speedup reindex
+        $this->es->indices()->create([
+            'index' => $realIndexName,
+            'body' => array_replace_recursive($this->getDefinitionBody($definition), [
+                'settings' => [
+                    'refresh_interval' => -1,
+                    'number_of_replicas' => 0,
+                ],
+            ]),
+        ]);
+        // 2. Run Reindex API with nowait
+        $task = $this->es->reindex([
+            'wait_for_completion' => false,
+            'body' => [
+                'source' => [
+                    'index' => $definition->getIndexAlias(),
+                    'size' => 500,
+                ],
+                'dest' => [
+                    'index' => $realIndexName,
+                ],
+            ],
+        ]);
+        // 3. Check reindex task status in loop
+        do {
+            $response = $this->es->tasks()->get([
+                'task_id' => $task['task']
+            ]);
+
+            sleep(1);
+        } while ((bool)$response['completed'] === false);
+        // 5. Update index settings from temporary
+        $settings = static::normalizeSettings($definition->getSettings());
+        $this->es->indices()->putSettings([
+            'index' => $realIndexName,
+            'body' => [
+                'number_of_replicas' => array_get($settings, 'index.number_of_replicas'),
+                'refresh_interval' => array_get($settings, 'index.refresh_interval'),
+            ],
+        ]);
+        // 6. Switch index alias
+        $this->es->indices()->updateAliases([
+            'body' => [
+                'actions' => [
+                    [
+                        'add' => [
+                            'index' => $realIndexName,
+                            'alias' => $definition->getIndexAlias(),
+                        ],
+                    ],
+                    [
+                        'remove' => [
+                            'index' => $oldIndexName,
+                            'alias' => $definition->getIndexAlias(),
+                        ],
+                    ],
+                ],
+            ],
+        ]);
+        // 8. Refresh new index
+        $this->es->indices()->refresh(['index' => $definition->getIndexAlias()]);
+        // 9. Delete old index
+        $this->es->indices()->delete(['index' => $oldIndexName]);
+    }
+
+
+    protected static function getDynamicSettings()
+    {
+        return [
+            'index.number_of_replicas',
+            'index.auto_expand_replicas',
+            'index.refresh_interval',
+            'index.max_result_window',
+            'index.max_inner_result_window',
+            'index.max_rescore_window',
+            'index.max_docvalue_fields_search',
+            'index.max_script_fields',
+            'index.max_ngram_diff',
+            'index.max_shingle_diff',
+            'index.blocks.read_only',
+            'index.blocks.read_only_allow_delete',
+            'index.blocks.read',
+            'index.blocks.write',
+            'index.blocks.metadata',
+            'index.max_refresh_listeners',
+        ];
+    }
+
+    protected static function normalizeSettings($settings)
+    {
+        if (empty($settings['index'])) {
+            $settings = ['index' => $settings];
+        }
+        // Unset index-specific properties
+        $unset = [
+            'provided_name',
+            'creation_date',
+            'uuid',
+            'version',
+        ];
+        foreach ($unset as $property) {
+            unset($settings['index'][$property]);
+        }
+        return $settings;
+    }
+
+    protected static function wasStaticSettingsChanged($current, $new): bool
+    {
+        $current = static::normalizeSettings($current);
+        $new = static::normalizeSettings($new);
+        $diff = static::arrayDiff($current, $new);
+        if (!count($diff)) {
+            return false;
+        }
+        $diff = static::arrayFlatten($diff);
+        $staticSettings = array_diff(array_keys($diff), static::getDynamicSettings());
+        return count($staticSettings) > 0;
+    }
+
+    /**
+     * Excludes static settings from settings array
+     * @param $settings
+     * @return array
+     */
+    protected static function filterStaticSettings($settings): array
+    {
+        $settings = static::normalizeSettings($settings);
+        $dynamicSettings = static::getDynamicSettings();
+        $settings = static::arrayFlatten($settings);
+        foreach ($settings as $key => $value) {
+            if (!in_array($key, $dynamicSettings)) {
+                unset($settings[$key]);
+            }
+        }
+        return $settings;
+    }
+
+    protected static function arrayFlatten(array $a): array
+    {
+        $iterator = new \RecursiveIteratorIterator(new \RecursiveArrayIterator($a));
+        $result = [];
+        foreach ($iterator as $leafValue) {
+            $keys = [];
+            foreach (range(0, $iterator->getDepth()) as $depth) {
+                $keys[] = $iterator->getSubIterator($depth)->key();
+            }
+            $result[implode('.', $keys)] = $leafValue;
+        }
+        return $result;
+    }
+
 
     protected static function arrayDiff($array1, $array2)
     {
@@ -102,227 +340,5 @@ class MigrationRunner
             }
         }
         return $difference;
-    }
-
-    /**
-     * @deprecated
-     * @return IndexDefinitionContract[]
-     */
-    public function getNewDefinitions(): array
-    {
-        $new = [];
-        foreach ($this->definitions->getDefinitions() as $definition) {
-            if (!$this->hasIndex($definition)) {
-                $new[] = $definition;
-            }
-        }
-        return $new;
-    }
-
-    /**
-     * @deprecated
-     * @return IndexDefinitionContract[]
-     */
-    public function getMappingChanges(): array
-    {
-        $changed = [];
-        foreach ($this->definitions->getDefinitions() as $definition) {
-            /** @var array $currentState */
-            $currentState = $this->es->indices()->get(['index' => $definition->getIndexName()]);
-            $oldIndexName = array_keys($currentState)[0];
-            $currentState = $currentState[$oldIndexName]['mappings'];
-            $expectedState = $this->getDefinitionBody($definition)['mappings'];
-            if (!$this->isIndexesEqual($currentState, $expectedState)) {
-                $changed[] = $definition;
-            }
-        }
-        return $changed;
-    }
-
-    /**
-     * @deprecated
-     * @return IndexDefinitionContract[]
-     */
-    public function getSettingsChanges(): array
-    {
-        $changed = [];
-        foreach ($this->definitions->getDefinitions() as $definition) {
-            /** @var array $currentState */
-            $currentState = $this->es->indices()->get(['index' => $definition->getIndexName()]);
-            $oldIndexName = array_keys($currentState)[0];
-            $currentState = $currentState[$oldIndexName];
-            $expectedState = $this->getDefinitionBody($definition);
-            if (!$this->isIndexesEqual($currentState, $expectedState)) {
-                $changed[] = $definition;
-            }
-        }
-        return $changed;
-    }
-
-    /**
-     * @deprecated
-     * @param IndexDefinitionContract $definition
-     * @return string
-     */
-    public function migrateDefinition(IndexDefinitionContract $definition): string
-    {
-        // TODO: cleanup
-        $realIndexName = $this->indexSuffix($definition->getIndexName());
-        if (!$this->hasIndex($definition)) {
-            // Create new index with alias
-            $this->es->indices()->create([
-                'index' => $realIndexName,
-                'body' => array_replace_recursive($this->getDefinitionBody($definition), [
-                    'aliases' => [
-                        $definition->getIndexName() => new stdClass(),
-                    ],
-                ]),
-            ]);
-        } else {
-            /** @var array $currentState */
-            $currentState = $this->es->indices()->get(['index' => $definition->getIndexName()]);
-            $oldIndexName = array_keys($currentState)[0];
-            // 1. Create new index without alias with temporary settings
-            $this->es->indices()->create([
-                'index' => $realIndexName,
-                'body' => array_replace_recursive($this->getDefinitionBody($definition), [
-                    'settings' => [
-                        'refresh_interval' => -1,
-                        'number_of_replicas' => 0,
-                    ],
-                ]),
-            ]);
-            // 2. Run Reindex API with nowait
-            $task = $this->es->reindex([
-                'wait_for_completion' => false,
-                'body' => [
-                    'source' => [
-                        'index' => $definition->getIndexName(),
-                        'size' => 500,
-                    ],
-                    'dest' => [
-                        'index' => $realIndexName,
-                    ],
-                ],
-            ]);
-            // 3. Check reindex task status in loop
-            do {
-                $response = $this->es->tasks()->get([
-                    'task_id' => $task['task']
-                ]);
-
-                sleep(1);
-            } while ((bool)$response['completed'] === false);
-            // 5. Update index settings from temporary
-            $settings = $definition->getSettings();
-            $this->es->indices()->putSettings([
-                'index' => $realIndexName,
-                'body' => [
-                    'number_of_replicas' => array_get($settings, 'index.number_of_replicas'),
-                    'refresh_interval' => array_get($settings, 'index.refresh_interval'),
-                ],
-            ]);
-            // 6. Update index alias
-            $this->es->indices()->updateAliases([
-                'body' => [
-                    'actions' => [
-                        [
-                            'add' => [
-                                'index' => $realIndexName,
-                                'alias' => $definition->getIndexName(),
-                            ],
-                        ],
-                    ],
-                ],
-            ]);
-            // 8. Refresh new index
-            $this->es->indices()->refresh(['index' => $definition->getIndexName()]);
-            // 9. Delete old index
-            $this->es->indices()->delete(['index' => $oldIndexName]);
-        }
-        return $realIndexName;
-    }
-
-    protected function normalizeSettings(array $settings)
-    {
-        if (!isset($settings['index'])) {
-            return ['index' => $settings];
-        } else {
-            return $settings;
-        }
-    }
-
-    public function getDefinitionState(IndexDefinitionContract $definition): string
-    {
-        $indices = $this->es->indices();
-        if (!$indices->exists(['index' => $definition->getIndexName()])) {
-            return self::STATE_ABSENT;
-        }
-        /** @var array $index */
-        $index = $indices->get(['index' => $definition->getIndexName()]);
-        $realIndexName = array_keys($index)[0];
-        $index = $index[$realIndexName];
-        $mappings = $index['mappings'];
-        $settings = $this->normalizeSettings($index['settings']);
-
-        if ($this->isMappingsChanged($definition, $mappings)) {
-            return self::STATE_REINDEX_REQUIRED;
-        }
-        if ($this->getChangedSettings($definition, $settings)) {
-            foreach ($settings as $setting => $value) {
-                if ($this->isSettingRequiresReindex($setting)) {
-                    return self::STATE_REINDEX_REQUIRED;
-                }
-            }
-            return self::STATE_SETTINGS_CHANGED;
-        }
-
-        return self::STATE_NOT_MODIFIED;
-    }
-
-    protected function isMappingsChanged(IndexDefinitionContract $definition, $expected)
-    {
-        $current = [$definition->getTypeName() => $definition->getMapping()];
-        return !empty(self::arrayDiff($current, $expected)) || !empty(self::arrayDiff($expected, $current));
-    }
-
-    /**
-     * Returns changed settings
-     * @param IndexDefinitionContract $definition
-     * @param $settings
-     * @return array
-     */
-    protected function getChangedSettings(IndexDefinitionContract $definition, $settings)
-    {
-        // TODO: real implementation
-        return $definition->getSettings();
-    }
-
-    /**
-     * @param string $setting
-     * @return bool
-     */
-    protected function isSettingRequiresReindex($setting)
-    {
-        // TODO: dot separator implementation
-        $dynamicSettings = [
-            'index.number_of_replicas',
-            'index.auto_expand_replicas',
-            'index.refresh_interval',
-            'index.max_result_window',
-            'index.max_inner_result_window',
-            'index.max_rescore_window',
-            'index.max_docvalue_fields_search',
-            'index.max_script_fields',
-            'index.max_ngram_diff',
-            'index.max_shingle_diff',
-            'index.blocks.read_only',
-            'index.blocks.read_only_allow_delete',
-            'index.blocks.read',
-            'index.blocks.write',
-            'index.blocks.metadata',
-            'index.max_refresh_listeners',
-        ];
-        return in_array($setting, $dynamicSettings);
     }
 }

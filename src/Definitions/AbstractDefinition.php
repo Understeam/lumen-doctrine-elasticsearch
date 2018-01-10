@@ -16,7 +16,7 @@ abstract class AbstractDefinition implements IndexDefinitionContract
      */
     public function getTypeName(): string
     {
-        return $this->getIndexName();
+        return $this->getIndexAlias();
     }
 
     /**

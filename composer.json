@@ -8,6 +8,9 @@
         "laravel-doctrine/orm": "^1.4",
         "nordsoftware/lumen-elasticsearch": "^2.3"
     },
+    "require-dev": {
+        "codeception/codeception": "^2.3"
+    },
     "license": "MIT",
     "authors": [
         {
@@ -19,6 +22,11 @@
     "autoload": {
         "psr-4": {
             "Understeam\\LumenDoctrineElasticsearch\\": "src"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Understeam\\Tests\\LumenDoctrineElasticsearch\\": "tests"
         }
     }
 }

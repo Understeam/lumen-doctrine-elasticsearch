@@ -71,7 +71,7 @@ class ElasticsearchEngine extends Engine implements ElasticsearchEngineContract
                 $action = $this->makeBulkAction();
                 $action->setAction('update', [
                     '_id' => $definition->getDocumentKey($model),
-                    '_index' => $definition->getIndexName(),
+                    '_index' => $definition->getIndexAlias(),
                     '_type' => $definition->getTypeName(),
                 ]);
                 $action->setBody([
@@ -100,7 +100,7 @@ class ElasticsearchEngine extends Engine implements ElasticsearchEngineContract
                 $action = $this->makeBulkAction();
                 $action->setAction('delete', [
                     '_id' => $definition->getDocumentKey($model),
-                    '_index' => $definition->getIndexName(),
+                    '_index' => $definition->getIndexAlias(),
                     '_type' => $definition->getTypeName(),
                 ]);
                 $bulk->addAction($action);

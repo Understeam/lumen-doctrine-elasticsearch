@@ -18,7 +18,7 @@ class MigrateAllCommand extends Command
      *
      * @var string
      */
-    protected $signature = 'doctrine:elastic:migrate:all';
+    protected $signature = 'doctrine:es:migrate:all';
 
     /**
      * The console command description.
@@ -40,25 +40,42 @@ class MigrateAllCommand extends Command
 
     public function handle()
     {
-        $new = $this->runner->getNewDefinitions();
-        if (count($new)) {
-            foreach ($this->runner->getNewDefinitions() as $definition) {
-                $this->info("Creating index for " . get_class($definition) . "...");
-                $index = $this->runner->migrateDefinition($definition);
-                $this->info("Created index {$index}.");
+        // TODO: single migrate command
+        foreach ($this->runner->getDefinitions() as $definition) {
+            $state = $this->runner->getDefinitionState($definition);
+            switch ($state) {
+                case MigrationRunner::STATE_NOT_MODIFIED:
+                    $this->info($definition->getIndexAlias() . ": not modified");
+                    break;
+                case MigrationRunner::STATE_ABSENT:
+                    $this->runner->createIndex($definition);
+                    $this->info($definition->getIndexAlias() . ": created");
+                    $this->info($definition->getIndexAlias() . ": importing...");
+                    $this->call("doctrine:es:import", [
+                        'class' => get_class($definition),
+                    ]);
+                    $this->info($definition->getIndexAlias() . ": import completed");
+                    break;
+                case MigrationRunner::STATE_SETTINGS_UPDATE_REQUIRED:
+                    $this->runner->updateSettings($definition);
+                    $this->info($definition->getIndexAlias() . ": settings updated");
+                    break;
+                case MigrationRunner::STATE_REINDEX_REQUIRED:
+                    $this->info($definition->getIndexAlias() . ": reindexing...");
+                    $this->runner->reindex($definition);
+                    $this->info($definition->getIndexAlias() . ": reindex completed");
+                    break;
+                case MigrationRunner::STATE_REIMPORT_REQUIRED:
+                    $this->info($definition->getIndexAlias() . ": reindexing...");
+                    $this->runner->reindex($definition);
+                    $this->info($definition->getIndexAlias() . ": reindex completed");
+                    $this->info($definition->getIndexAlias() . ": importing...");
+                    $this->call("doctrine:es:import", [
+                        'class' => get_class($definition),
+                    ]);
+                    $this->info($definition->getIndexAlias() . ": import completed");
+                    break;
             }
-        } else {
-            $this->info("No new definitions found.");
-        }
-        $changed = $this->runner->getMappingChanges();
-        if (count($changed)) {
-            foreach ($this->runner->getMappingChanges() as $definition) {
-                $this->info("Migrating index for " . get_class($definition) . "...");
-                $index = $this->runner->migrateDefinition($definition);
-                $this->info("Migrated index to {$index}.");
-            }
-        } else {
-            $this->info("No changed definitions detected.");
         }
     }
 }

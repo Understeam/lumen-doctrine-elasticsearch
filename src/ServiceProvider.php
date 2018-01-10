@@ -18,6 +18,7 @@ use Understeam\LumenDoctrineElasticsearch\Definitions\DefinitionDispatcher;
 use Understeam\LumenDoctrineElasticsearch\Definitions\DefinitionDispatcherContract;
 use Understeam\LumenDoctrineElasticsearch\Engine\ElasticsearchEngine;
 use Understeam\LumenDoctrineElasticsearch\Engine\ElasticsearchEngineContract;
+use Understeam\LumenDoctrineElasticsearch\Migrations\Commands\ImportCommand;
 use Understeam\LumenDoctrineElasticsearch\Migrations\Commands\MigrateAllCommand;
 
 /**
@@ -36,7 +37,6 @@ class ServiceProvider extends \Illuminate\Support\ServiceProvider
         $this->registerDefinitionDispatcher();
         $this->registerEngine();
         $this->registerScoutEngine();
-        $this->registerElasticsearch();
         $this->registerMigrations();
     }
 
@@ -55,22 +55,6 @@ class ServiceProvider extends \Illuminate\Support\ServiceProvider
         $this->app->make(EngineManager::class)->extend('elasticsearch', function () {
             return $this->app->make(ElasticsearchEngineContract::class);
         });
-    }
-
-    /**
-     * @throws \Exception
-     */
-    protected function registerElasticsearch()
-    {
-        if (!$this->app->has(ElasticsearchServiceContract::class)) {
-            throw new \Exception("You should register " . ElasticsearchServiceProvider::class . " before " . __CLASS__);
-        }
-        $this->commands([
-            CreateCommand::class,
-            DeleteCommand::class,
-            CreateMigrationCommand::class,
-            ApplyMigrationCommand::class,
-        ]);
     }
 
     protected function registerDefinitionDispatcher()
@@ -94,6 +78,7 @@ class ServiceProvider extends \Illuminate\Support\ServiceProvider
     protected function registerMigrations()
     {
         $this->commands([
+            ImportCommand::class,
             MigrateAllCommand::class,
         ]);
     }

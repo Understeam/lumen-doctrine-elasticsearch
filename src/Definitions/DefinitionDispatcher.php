@@ -29,6 +29,17 @@ class DefinitionDispatcher implements DefinitionDispatcherContract
     protected $typeMap = [];
 
     /**
+     * DefinitionDispatcher constructor.
+     * @param IndexDefinitionContract[] $definitions
+     */
+    public function __construct(array $definitions = [])
+    {
+        foreach ($definitions as $definition) {
+            $this->addDefinition($definition);
+        }
+    }
+
+    /**
      * @inheritdoc
      */
     public function getDefinitions(): array
@@ -43,7 +54,7 @@ class DefinitionDispatcher implements DefinitionDispatcherContract
     {
         $this->definitions[get_class($definition)] = $definition;
         $this->entityMap[$definition->getEntityClass()][] = $definition;
-        $this->typeMap[$definition->getIndexName() . '.' . $definition->getTypeName()] = $definition;
+        $this->typeMap[$definition->getIndexAlias() . '.' . $definition->getTypeName()] = $definition;
     }
 
     /**

@@ -12,10 +12,10 @@ interface IndexDefinitionContract
 {
 
     /**
-     * Index name
+     * Index alias name
      * @return string
      */
-    public function getIndexName(): string;
+    public function getIndexAlias(): string;
 
     /**
      * Type name
