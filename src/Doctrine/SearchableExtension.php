@@ -7,7 +7,7 @@ use Doctrine\Common\EventManager;
 use Doctrine\ORM\EntityManagerInterface;
 use LaravelDoctrine\ORM\Extensions\Extension;
 use Understeam\LumenDoctrineElasticsearch\Definitions\DefinitionDispatcherContract;
-use Understeam\LumenDoctrineElasticsearch\Engine\ElasticsearchEngineContract;
+use Understeam\LumenDoctrineElasticsearch\Indexer\IndexerContract;
 
 class SearchableExtension implements Extension
 {
@@ -17,15 +17,15 @@ class SearchableExtension implements Extension
     protected $definitions;
 
     /**
-     * @var ElasticsearchEngineContract
+     * @var IndexerContract
      */
     protected $engine;
 
     /**
      * @param DefinitionDispatcherContract $definitions
-     * @param ElasticsearchEngineContract $engine
+     * @param IndexerContract $engine
      */
-    public function __construct(DefinitionDispatcherContract $definitions, ElasticsearchEngineContract $engine)
+    public function __construct(DefinitionDispatcherContract $definitions, IndexerContract $engine)
     {
         $this->definitions = $definitions;
         $this->engine = $engine;

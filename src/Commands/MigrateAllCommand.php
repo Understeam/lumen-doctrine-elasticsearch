@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-namespace Understeam\LumenDoctrineElasticsearch\Migrations\Commands;
+namespace Understeam\LumenDoctrineElasticsearch\Commands;
 
 use Illuminate\Console\Command;
 use Understeam\LumenDoctrineElasticsearch\Migrations\MigrationRunner;
@@ -9,7 +9,7 @@ use Understeam\LumenDoctrineElasticsearch\Migrations\MigrationRunner;
 /**
  * Class MigrateCommand
  *
- * @author Anatoly Rugalev <anatoliy.rugalev@gs-labs.ru>
+ * @author Anatoly Rugalev <anatoly.rugalev@gmail.com>
  */
 class MigrateAllCommand extends Command
 {
@@ -38,10 +38,14 @@ class MigrateAllCommand extends Command
         $this->runner = $runner;
     }
 
+    /**
+     * @throws \Exception
+     */
     public function handle()
     {
         // TODO: single migrate command
-        foreach ($this->runner->getDefinitions() as $definition) {
+        foreach ($this->runner->getRepositories() as $repositoryClass) {
+            $definition = $this->runner->getDefinition($repositoryClass);
             $state = $this->runner->getDefinitionState($definition);
             switch ($state) {
                 case MigrationRunner::STATE_NOT_MODIFIED:
@@ -71,7 +75,7 @@ class MigrateAllCommand extends Command
                     $this->info($definition->getIndexAlias() . ": reindex completed");
                     $this->info($definition->getIndexAlias() . ": importing...");
                     $this->call("doctrine:es:import", [
-                        'class' => get_class($definition),
+                        'repository' => $repositoryClass,
                     ]);
                     $this->info($definition->getIndexAlias() . ": import completed");
                     break;

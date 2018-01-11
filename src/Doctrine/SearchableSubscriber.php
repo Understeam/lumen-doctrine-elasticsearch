@@ -5,9 +5,8 @@ namespace Understeam\LumenDoctrineElasticsearch\Doctrine;
 use Doctrine\Common\EventSubscriber;
 use Doctrine\ORM\Event\LifecycleEventArgs;
 use Doctrine\ORM\Events;
-use Illuminate\Support\Collection;
 use Understeam\LumenDoctrineElasticsearch\Definitions\DefinitionDispatcherContract;
-use Understeam\LumenDoctrineElasticsearch\Engine\ElasticsearchEngineContract;
+use Understeam\LumenDoctrineElasticsearch\Indexer\IndexerContract;
 
 class SearchableSubscriber implements EventSubscriber
 {
@@ -26,14 +25,14 @@ class SearchableSubscriber implements EventSubscriber
      */
     protected $definitions;
     /**
-     * @var ElasticsearchEngineContract
+     * @var IndexerContract
      */
-    protected $engine;
+    protected $indexer;
 
-    public function __construct(DefinitionDispatcherContract $definitions, ElasticsearchEngineContract $engine)
+    public function __construct(DefinitionDispatcherContract $definitions, IndexerContract $indexer)
     {
         $this->definitions = $definitions;
-        $this->engine = $engine;
+        $this->indexer = $indexer;
     }
 
     /**
@@ -96,13 +95,31 @@ class SearchableSubscriber implements EventSubscriber
         $this->toIndex[] = $object;
     }
 
+    protected function mapDefinitions(array $objects)
+    {
+        $result = [];
+        foreach ($objects as $object) {
+            $definitions = $this->definitions->getEntityDefinitions(get_class($object));
+            foreach($definitions as $definition) {
+                if (!$definition) {
+                    continue;
+                }
+                $result[get_class($definition)][] = $object;
+            }
+        }
+        return $result;
+    }
+
     /**
      * @param array $objects
      */
     protected function indexEntities(array $objects)
     {
-        // TODO: queuing
-        $this->engine->update(new Collection($objects));
+        // TODO: queueing
+        $definitionMap = $this->mapDefinitions($objects);
+        foreach ($definitionMap as $definitionClass => $objects) {
+            $this->indexer->updateEntities($this->definitions->getDefinition($definitionClass), $objects);
+        }
     }
 
     /**
@@ -111,6 +128,9 @@ class SearchableSubscriber implements EventSubscriber
     protected function removeEntities(array $objects)
     {
         // TODO: queueing
-        $this->engine->update(new Collection($objects));
+        $definitionMap = $this->mapDefinitions($objects);
+        foreach ($definitionMap as $definitionClass => $objects) {
+            $this->indexer->deleteEntities($this->definitions->getDefinition($definitionClass), $objects);
+        }
     }
 }

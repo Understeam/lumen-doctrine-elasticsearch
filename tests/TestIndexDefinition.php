@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-namespace Understeam\Tests\LumenDoctrineElasticsearch\Definitions;
+namespace Understeam\Tests\LumenDoctrineElasticsearch;
 
 use Understeam\LumenDoctrineElasticsearch\Definitions\AbstractDefinition;
 use Understeam\Tests\LumenDoctrineElasticsearch\TestEntity;

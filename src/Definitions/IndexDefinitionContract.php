@@ -6,7 +6,7 @@ namespace Understeam\LumenDoctrineElasticsearch\Definitions;
 /**
  * Interface IndexDefinitionContract
  *
- * @author Anatoly Rugalev <anatoliy.rugalev@gs-labs.ru>
+ * @author Anatoly Rugalev <anatoly.rugalev@gmail.com>
  */
 interface IndexDefinitionContract
 {

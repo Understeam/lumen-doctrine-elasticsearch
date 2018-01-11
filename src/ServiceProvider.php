@@ -3,28 +3,20 @@ declare(strict_types=1);
 
 namespace Understeam\LumenDoctrineElasticsearch;
 
-use Elasticsearch\Client;
-use Elasticsearch\ClientBuilder;
 use Illuminate\Contracts\Config\Repository;
-use Illuminate\Contracts\Foundation\Application;
-use Laravel\Scout\EngineManager;
-use Nord\Lumen\Elasticsearch\Console\ApplyMigrationCommand;
-use Nord\Lumen\Elasticsearch\Console\CreateCommand;
-use Nord\Lumen\Elasticsearch\Console\CreateMigrationCommand;
-use Nord\Lumen\Elasticsearch\Console\DeleteCommand;
-use Nord\Lumen\Elasticsearch\Contracts\ElasticsearchServiceContract;
-use Nord\Lumen\Elasticsearch\ElasticsearchServiceProvider;
 use Understeam\LumenDoctrineElasticsearch\Definitions\DefinitionDispatcher;
 use Understeam\LumenDoctrineElasticsearch\Definitions\DefinitionDispatcherContract;
-use Understeam\LumenDoctrineElasticsearch\Engine\ElasticsearchEngine;
-use Understeam\LumenDoctrineElasticsearch\Engine\ElasticsearchEngineContract;
-use Understeam\LumenDoctrineElasticsearch\Migrations\Commands\ImportCommand;
-use Understeam\LumenDoctrineElasticsearch\Migrations\Commands\MigrateAllCommand;
+use Understeam\LumenDoctrineElasticsearch\Indexer\Indexer;
+use Understeam\LumenDoctrineElasticsearch\Indexer\IndexerContract;
+use Understeam\LumenDoctrineElasticsearch\Commands\ImportCommand;
+use Understeam\LumenDoctrineElasticsearch\Commands\MigrateAllCommand;
+use Understeam\LumenDoctrineElasticsearch\Search\Engine;
+use Understeam\LumenDoctrineElasticsearch\Search\EngineContract;
 
 /**
  * Class ServiceProvider
  *
- * @author Anatoly Rugalev <anatoliy.rugalev@gs-labs.ru>
+ * @author Anatoly Rugalev <anatoly.rugalev@gmail.com>
  */
 class ServiceProvider extends \Illuminate\Support\ServiceProvider
 {
@@ -36,25 +28,23 @@ class ServiceProvider extends \Illuminate\Support\ServiceProvider
     {
         $this->registerDefinitionDispatcher();
         $this->registerEngine();
-        $this->registerScoutEngine();
+        $this->registerIndexer();
         $this->registerMigrations();
     }
 
     public function boot(Repository $config)
     {
-        $this->registerDefinitions($config->get('doctrine_elasticsearch.definitions', []));
+        $this->registerDefinitions($config->get('doctrine_elasticsearch.repositories', []));
     }
 
     protected function registerEngine()
     {
-        $this->app->bind(ElasticsearchEngineContract::class, ElasticsearchEngine::class);
+        $this->app->bind(EngineContract::class, Engine::class);
     }
 
-    protected function registerScoutEngine()
+    protected function registerIndexer()
     {
-        $this->app->make(EngineManager::class)->extend('elasticsearch', function () {
-            return $this->app->make(ElasticsearchEngineContract::class);
-        });
+        $this->app->bind(IndexerContract::class, Indexer::class);
     }
 
     protected function registerDefinitionDispatcher()
@@ -62,13 +52,13 @@ class ServiceProvider extends \Illuminate\Support\ServiceProvider
         $this->app->singleton(DefinitionDispatcherContract::class, DefinitionDispatcher::class);
     }
 
-    protected function registerDefinitions($definitions)
+    protected function registerDefinitions($repositories)
     {
         $this->app->extend(
             DefinitionDispatcherContract::class,
-            function (DefinitionDispatcherContract $dispatcher) use ($definitions) {
-                foreach ($definitions as $definition) {
-                    $dispatcher->addDefinition($this->app->make($definition));
+            function (DefinitionDispatcherContract $dispatcher) use ($repositories) {
+                foreach ($repositories as $repositoryClass) {
+                    $dispatcher->addRepository($this->app->make($repositoryClass));
                 }
                 return $dispatcher;
             }

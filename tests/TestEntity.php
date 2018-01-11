@@ -11,14 +11,23 @@ namespace Understeam\Tests\LumenDoctrineElasticsearch;
 class TestEntity
 {
 
+    private $id;
+    private $name;
+
+    public function __construct($id, $name)
+    {
+        $this->id = $id;
+        $this->name = $name;
+    }
+
     public function getId()
     {
-        return 1;
+        return $this->id;
     }
 
     public function getName()
     {
-        return 'test-name';
+        return $this->name;
     }
 
 }

@@ -11,7 +11,7 @@ use Understeam\LumenDoctrineElasticsearch\Definitions\IndexDefinitionContract;
 /**
  * Class MigrationRunner
  *
- * @author Anatoly Rugalev <anatoliy.rugalev@gs-labs.ru>
+ * @author Anatoly Rugalev <anatoly.rugalev@gmail.com>
  */
 class MigrationRunner
 {
@@ -25,10 +25,10 @@ class MigrationRunner
     protected $es;
 
     const STATE_ABSENT = 'absent';
-    const STATE_REIMPORT_REQUIRED = 'reimport-required';
-    const STATE_REINDEX_REQUIRED = 'reindex-required';
-    const STATE_SETTINGS_UPDATE_REQUIRED = 'settings-update-required';
     const STATE_NOT_MODIFIED = 'not-modified';
+    const STATE_SETTINGS_UPDATE_REQUIRED = 'settings-update-required';
+    const STATE_REINDEX_REQUIRED = 'reindex-required';
+    const STATE_REIMPORT_REQUIRED = 'reimport-required';
 
     /**
      * MigrationRunner constructor.
@@ -42,11 +42,16 @@ class MigrationRunner
     }
 
     /**
-     * @return array|IndexDefinitionContract[]
+     * @return string[]
      */
-    public function getDefinitions()
+    public function getRepositories()
     {
-        return $this->definitions->getDefinitions();
+        return $this->definitions->getRepositoryClasses();
+    }
+
+    public function getDefinition($repositoryClass): IndexDefinitionContract
+    {
+        return $this->definitions->getRepositoryDefinition($repositoryClass);
     }
 
     protected function getDefinitionBody(IndexDefinitionContract $definition)
@@ -84,6 +89,11 @@ class MigrationRunner
         return Arr::first(array_keys($data));
     }
 
+    /**
+     * @param IndexDefinitionContract $definition
+     * @return string
+     * @throws \Exception
+     */
     public function getDefinitionState(IndexDefinitionContract $definition): string
     {
         $indices = $this->es->indices();
@@ -96,7 +106,10 @@ class MigrationRunner
             'type' => $definition->getTypeName()
         ]);
 
-        $meta = $mapping[$realName]['mappings'][$definition->getIndexAlias()]['_meta'];
+        $meta = $mapping[$realName]['mappings'][$definition->getIndexAlias()]['_meta'] ?? null;
+        if ($meta === null) {
+            throw new \Exception("Index {$realName} was not created by this migrations. Delete or rename index to continue");
+        }
         $originalMappings = unserialize($meta['mappings']);
         if ($originalMappings !== $definition->getMapping()) {
             // Mapping was changed
@@ -156,6 +169,7 @@ class MigrationRunner
             ]
         ]);
     }
+
 
     /**
      * Recreates index and moves data into new index
@@ -233,7 +247,6 @@ class MigrationRunner
         $this->es->indices()->delete(['index' => $oldIndexName]);
     }
 
-
     protected static function getDynamicSettings()
     {
         return [
@@ -305,6 +318,7 @@ class MigrationRunner
         return $settings;
     }
 
+
     protected static function arrayFlatten(array $a): array
     {
         $iterator = new \RecursiveIteratorIterator(new \RecursiveArrayIterator($a));
@@ -318,7 +332,6 @@ class MigrationRunner
         }
         return $result;
     }
-
 
     protected static function arrayDiff($array1, $array2)
     {

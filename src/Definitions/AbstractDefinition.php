@@ -6,7 +6,7 @@ namespace Understeam\LumenDoctrineElasticsearch\Definitions;
 /**
  * Class AbstractDefinition
  *
- * @author Anatoly Rugalev <anatoliy.rugalev@gs-labs.ru>
+ * @author Anatoly Rugalev <anatoly.rugalev@gmail.com>
  */
 abstract class AbstractDefinition implements IndexDefinitionContract
 {

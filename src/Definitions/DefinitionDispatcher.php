@@ -4,11 +4,12 @@ declare(strict_types=1);
 namespace Understeam\LumenDoctrineElasticsearch\Definitions;
 
 use Doctrine\Common\Util\ClassUtils;
+use Understeam\LumenDoctrineElasticsearch\Doctrine\SearchableRepositoryContract;
 
 /**
  * Class DefinitionManager
  *
- * @author Anatoly Rugalev <anatoliy.rugalev@gs-labs.ru>
+ * @author Anatoly Rugalev <anatoly.rugalev@gmail.com>
  */
 class DefinitionDispatcher implements DefinitionDispatcherContract
 {
@@ -26,16 +27,16 @@ class DefinitionDispatcher implements DefinitionDispatcherContract
     /**
      * @var IndexDefinitionContract[]
      */
-    protected $typeMap = [];
+    protected $repositoryMap = [];
 
     /**
      * DefinitionDispatcher constructor.
-     * @param IndexDefinitionContract[] $definitions
+     * @param IndexDefinitionContract[] $repositories
      */
-    public function __construct(array $definitions = [])
+    public function __construct(array $repositories = [])
     {
-        foreach ($definitions as $definition) {
-            $this->addDefinition($definition);
+        foreach ($repositories as $repository) {
+            $this->addRepository($repository);
         }
     }
 
@@ -50,11 +51,41 @@ class DefinitionDispatcher implements DefinitionDispatcherContract
     /**
      * @inheritdoc
      */
-    public function addDefinition(IndexDefinitionContract $definition): void
+    public function getRepositoryClasses(): array
     {
+        return array_keys($this->repositoryMap);
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function getDefinition(string $class): ?IndexDefinitionContract
+    {
+        if (isset($this->definitions[$class])) {
+            return $this->definitions[$class];
+        } else {
+            return null;
+        }
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function addRepository(SearchableRepositoryContract $repository): void
+    {
+        $definition = $this->createDefinition($repository->getIndexDefinitionClass());
+        $this->repositoryMap[get_class($repository)] = $definition;
         $this->definitions[get_class($definition)] = $definition;
         $this->entityMap[$definition->getEntityClass()][] = $definition;
-        $this->typeMap[$definition->getIndexAlias() . '.' . $definition->getTypeName()] = $definition;
+    }
+
+    /**
+     * @param string $class
+     * @return IndexDefinitionContract
+     */
+    protected function createDefinition(string $class): IndexDefinitionContract
+    {
+        return new $class;
     }
 
     /**
@@ -69,20 +100,20 @@ class DefinitionDispatcher implements DefinitionDispatcherContract
     /**
      * @inheritdoc
      */
+    public function getRepositoryDefinition($repositoryClass): ?IndexDefinitionContract
+    {
+        return $this->repositoryMap[$repositoryClass] ?? null;
+    }
+
+    /**
+     * @inheritdoc
+     */
     public function hasEntity($entityClass): bool
     {
         if (is_object($entityClass)) {
             $entityClass = ClassUtils::getClass($entityClass);
         }
         return !empty($this->entityMap[$entityClass]);
-    }
-
-    /**
-     * @inheritdoc
-     */
-    public function getTypeDefinition(string $index, string $type): ?IndexDefinitionContract
-    {
-        return $this->typeMap["{$index}.{$type}"] ?? null;
     }
 
 }

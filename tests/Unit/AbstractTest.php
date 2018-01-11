@@ -7,8 +7,10 @@ use Codeception\Test\Unit;
 use Elasticsearch\ClientBuilder;
 use Nord\Lumen\Elasticsearch\ElasticsearchService;
 use Understeam\LumenDoctrineElasticsearch\Definitions\DefinitionDispatcher;
+use Understeam\LumenDoctrineElasticsearch\Indexer\Indexer;
 use Understeam\LumenDoctrineElasticsearch\Migrations\MigrationRunner;
-use Understeam\Tests\LumenDoctrineElasticsearch\Definitions\TestIndexDefinition;
+use Understeam\Tests\LumenDoctrineElasticsearch\TestIndexDefinition;
+use Understeam\Tests\LumenDoctrineElasticsearch\TestRepository;
 
 /**
  * Class AbstractTest
@@ -38,17 +40,29 @@ abstract class AbstractTest extends Unit
      */
     protected $definition;
 
+    /**
+     * @var Indexer
+     */
+    protected $indexer;
+
+    /**
+     * @var TestRepository
+     */
+    protected $repository;
+
     protected function _before()
     {
+        $this->repository = new TestRepository();
         $this->definition = new TestIndexDefinition();
         $definitions = new DefinitionDispatcher([
-            $this->definition,
+            $this->repository,
         ]);
         $this->es = new ElasticsearchService(ClientBuilder::fromConfig(ES_CONFIG));
         $this->runner = new MigrationRunner(
             $definitions,
             $this->es
         );
+        $this->indexer = new Indexer($this->es);
         $this->deleteIndex();
     }
 

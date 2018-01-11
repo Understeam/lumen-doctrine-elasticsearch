@@ -3,10 +3,12 @@ declare(strict_types=1);
 
 namespace Understeam\LumenDoctrineElasticsearch\Definitions;
 
+use Understeam\LumenDoctrineElasticsearch\Doctrine\SearchableRepositoryContract;
+
 /**
  * Interface DefinitionDispatcherContract
  *
- * @author Anatoly Rugalev <anatoliy.rugalev@gs-labs.ru>
+ * @author Anatoly Rugalev <anatoly.rugalev@gmail.com>
  */
 interface DefinitionDispatcherContract
 {
@@ -18,10 +20,17 @@ interface DefinitionDispatcherContract
     public function getDefinitions(): array;
 
     /**
-     * Adds definition instance to dispatcher
-     * @param IndexDefinitionContract $definition
+     * Returns definition by class name
+     * @param string $class
+     * @return null|IndexDefinitionContract
      */
-    public function addDefinition(IndexDefinitionContract $definition): void;
+    public function getDefinition(string $class): ?IndexDefinitionContract;
+
+    /**
+     * Adds definition instance to dispatcher
+     * @param SearchableRepositoryContract $repository
+     */
+    public function addRepository(SearchableRepositoryContract $repository): void;
 
     /**
      * Returns array of definitions associated with given entity
@@ -38,11 +47,16 @@ interface DefinitionDispatcherContract
     public function hasEntity($entityClass): bool;
 
     /**
-     * Returns definition which defines given index type
-     * @param string $index
-     * @param string $type
+     * Returns definition associated with given repository class
+     * @param $repositoryClass
      * @return null|IndexDefinitionContract
      */
-    public function getTypeDefinition(string $index, string $type): ?IndexDefinitionContract;
+    public function getRepositoryDefinition($repositoryClass): ?IndexDefinitionContract;
+
+    /**
+     * Returns all registered repository classes
+     * @return string[]
+     */
+    public function getRepositoryClasses(): array;
 
 }
