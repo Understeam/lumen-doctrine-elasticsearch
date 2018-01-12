@@ -55,9 +55,7 @@ class MigrateAllCommand extends Command
                     $this->runner->createIndex($definition);
                     $this->info($definition->getIndexAlias() . ": created");
                     $this->info($definition->getIndexAlias() . ": importing...");
-                    $this->call("doctrine:es:import", [
-                        'class' => get_class($definition),
-                    ]);
+                    $this->importRepository($repositoryClass);
                     $this->info($definition->getIndexAlias() . ": import completed");
                     break;
                 case MigrationRunner::STATE_SETTINGS_UPDATE_REQUIRED:
@@ -74,12 +72,17 @@ class MigrateAllCommand extends Command
                     $this->runner->reindex($definition);
                     $this->info($definition->getIndexAlias() . ": reindex completed");
                     $this->info($definition->getIndexAlias() . ": importing...");
-                    $this->call("doctrine:es:import", [
-                        'repository' => $repositoryClass,
-                    ]);
+                    $this->importRepository($repositoryClass);
                     $this->info($definition->getIndexAlias() . ": import completed");
                     break;
             }
         }
+    }
+
+    protected function importRepository($repositoryClass)
+    {
+        $this->call("doctrine:es:import", [
+            'repository' => $repositoryClass,
+        ]);
     }
 }
