@@ -1,6 +1,6 @@
 {
     "name": "understeam/lumen-doctrine-elasticsearch",
-    "description": "Lumen + Doctrine + Scout Elasticsearch integration",
+    "description": "Lumen + Doctrine + Elasticsearch integration",
     "type": "library",
     "require": {
         "php": ">=7.2",
