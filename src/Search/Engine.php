@@ -3,11 +3,12 @@ declare(strict_types=1);
 
 namespace Understeam\LumenDoctrineElasticsearch\Search;
 
+use Illuminate\Contracts\Container\Container;
 use Nord\Lumen\Elasticsearch\Contracts\ElasticsearchServiceContract;
 use ONGR\ElasticsearchDSL\Search;
-use Understeam\LumenDoctrineElasticsearch\Definitions\DefinitionDispatcherContract;
 use Understeam\LumenDoctrineElasticsearch\Definitions\IndexDefinitionContract;
 use Understeam\LumenDoctrineElasticsearch\Doctrine\SearchableRepositoryContract;
+use Understeam\LumenDoctrineElasticsearch\Search\Suggest\SuggestCollectionContract;
 
 /**
  * Class Engine
@@ -22,56 +23,80 @@ class Engine implements EngineContract
      */
     protected $es;
     /**
-     * @var DefinitionDispatcherContract
+     * @var IndexDefinitionContract
      */
-    protected $definitions;
+    protected $definition;
+    /**
+     * @var Container
+     */
+    protected $container;
+    /**
+     * @var SearchableRepositoryContract
+     */
+    protected $repository;
 
     /**
      * Engine constructor.
      * @param ElasticsearchServiceContract $es
-     * @param DefinitionDispatcherContract $definitions
+     * @param IndexDefinitionContract $definition
+     * @param SearchableRepositoryContract $repository
+     * @param Container $container
      */
-    public function __construct(ElasticsearchServiceContract $es, DefinitionDispatcherContract $definitions)
-    {
+    public function __construct(
+        ElasticsearchServiceContract $es,
+        IndexDefinitionContract $definition,
+        SearchableRepositoryContract $repository,
+        Container $container
+    ) {
         $this->es = $es;
-        $this->definitions = $definitions;
+        $this->definition = $definition;
+        $this->container = $container;
+        $this->repository = $repository;
     }
 
     /**
      * @inheritdoc
      */
-    public function mapResults(SearchableRepositoryContract $repository, array $results): array
+    public function mapHits(array $hits): array
     {
-        return $repository->findByIdsInOrder(array_column($results, '_id'));
+        if (!count($hits)) {
+            return [];
+        }
+        return $this->repository->findByIdsInOrder(array_column($hits, '_id'));
     }
 
     /**
-     * @param SearchableRepositoryContract $repository
-     * @param Search $query
-     * @return SearchResultContract
+     * @inheritdoc
      */
-    public function search(SearchableRepositoryContract $repository, Search $query): SearchResultContract
+    public function executeSearch(Search $query): SearchResultContract
     {
-        $definition = $this->definitions->getRepositoryDefinition(get_class($repository));
-        $data = $this->executeSearch($definition, $query);
-        $hits = $data['hits']['hits'] ?? [];
-        if (count($hits)) {
-            $total = $data['hits']['total'] ?? 0;
-            $items = $this->mapResults($repository, $hits);
-        } else {
-            $total = 0;
-            $items = [];
-        }
-        return new SearchResult($total, $items);
-    }
-
-    public function executeSearch(IndexDefinitionContract $definition, Search $query): array
-    {
-        return $this->es->search([
+        $data = $this->es->search([
             '_source' => false,
-            'index' => $definition->getIndexAlias(),
-            'type' => $definition->getTypeName(),
+            'index' => $this->definition->getIndexAlias(),
+            'type' => $this->definition->getTypeName(),
             'body' => $query->toArray(),
         ]);
+        return $this->container->make(SearchResultContract::class, [
+            'container' => $this->container,
+            'data' => $data,
+        ]);
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function search(Search $query): array
+    {
+        $result = $this->executeSearch($query);
+        return $this->mapHits($result->getHits()->getHits());
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function suggest(Search $query): ?SuggestCollectionContract
+    {
+        $result = $this->executeSearch($query);
+        return $result->getSuggestions();
     }
 }

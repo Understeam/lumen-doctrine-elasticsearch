@@ -3,6 +3,9 @@ declare(strict_types=1);
 
 namespace Understeam\LumenDoctrineElasticsearch\Search;
 
+use Understeam\LumenDoctrineElasticsearch\Search\Hits\HitsCollectionContract;
+use Understeam\LumenDoctrineElasticsearch\Search\Suggest\SuggestCollectionContract;
+
 /**
  * Interface SearchResultContract
  *
@@ -11,8 +14,16 @@ namespace Understeam\LumenDoctrineElasticsearch\Search;
 interface SearchResultContract
 {
 
-    public function getTotal(): int;
+    /**
+     * Returns hits total count
+     * @return null|HitsCollectionContract
+     */
+    public function getHits(): ?HitsCollectionContract;
 
-    public function getItems(): array;
+    /**
+     * Returns suggestions
+     * @return null|SuggestCollectionContract
+     */
+    public function getSuggestions(): ?SuggestCollectionContract;
 
 }

@@ -35,17 +35,29 @@ class Indexer implements IndexerContract
     {
         $bulk = [];
         foreach ($entities as $entity) {
-            $bulk[] = [
-                'update' => [
-                    '_id' => $definition->getDocumentKey($entity),
-                    '_index' => $definition->getIndexAlias(),
-                    '_type' => $definition->getTypeName(),
-                ],
-            ];
-            $bulk[] = [
-                'doc' => $definition->getDocument($entity),
-                'doc_as_upsert' => true,
-            ];
+            $document = $definition->getDocument($entity);
+            // If document is null, considering as deleted
+            if ($document !== null) {
+                $bulk[] = [
+                    'update' => [
+                        '_id' => $definition->getDocumentKey($entity),
+                        '_index' => $definition->getIndexAlias(),
+                        '_type' => $definition->getTypeName(),
+                    ],
+                ];
+                $bulk[] = [
+                    'doc' => $document,
+                    'doc_as_upsert' => true,
+                ];
+            } else {
+                $bulk[] = [
+                    'delete' => [
+                        '_id' => $definition->getDocumentKey($entity),
+                        '_index' => $definition->getIndexAlias(),
+                        '_type' => $definition->getTypeName(),
+                    ],
+                ];
+            }
         }
         if (count($bulk)) {
             $this->es->bulk(['body' => $bulk]);

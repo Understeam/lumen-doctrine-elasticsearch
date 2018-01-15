@@ -58,6 +58,6 @@ interface IndexDefinitionContract
      * @param object $entity entity instance
      * @return array
      */
-    public function getDocument($entity): array;
+    public function getDocument($entity): ?array;
 
 }

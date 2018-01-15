@@ -29,6 +29,6 @@ interface SearchableRepositoryContract
      * Returns index definition class
      * @return string
      */
-    public function getIndexDefinitionClass(): string;
+    public static function getIndexDefinitionClass(): string;
 
 }

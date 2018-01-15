@@ -4,8 +4,8 @@ declare(strict_types=1);
 namespace Understeam\LumenDoctrineElasticsearch\Search;
 
 use ONGR\ElasticsearchDSL\Search;
-use Understeam\LumenDoctrineElasticsearch\Definitions\IndexDefinitionContract;
 use Understeam\LumenDoctrineElasticsearch\Doctrine\SearchableRepositoryContract;
+use Understeam\LumenDoctrineElasticsearch\Search\Suggest\SuggestCollectionContract;
 
 /**
  * Interface EngineContract
@@ -15,9 +15,31 @@ use Understeam\LumenDoctrineElasticsearch\Doctrine\SearchableRepositoryContract;
 interface EngineContract
 {
 
-    public function mapResults(SearchableRepositoryContract $repository, array $results): array;
+    /**
+     * Maps search results to entities via search repository
+     * @param array $hits
+     * @return object[] array of entities
+     */
+    public function mapHits(array $hits): array;
 
-    public function search(SearchableRepositoryContract $repository, Search $query): SearchResultContract;
+    /**
+     * Executes search in given repository
+     * @param Search $query search request
+     * @return object[] found entities
+     */
+    public function search(Search $query): array;
 
-    public function executeSearch(IndexDefinitionContract $definition, Search $query): array;
+    /**
+     * Executes any search request
+     * @param Search $query
+     * @return SearchResultContract search result
+     */
+    public function executeSearch(Search $query): SearchResultContract;
+
+    /**
+     * Executes suggest request
+     * @param Search $query
+     * @return null|SuggestCollectionContract suggest collection
+     */
+    public function suggest(Search $query): ?SuggestCollectionContract;
 }

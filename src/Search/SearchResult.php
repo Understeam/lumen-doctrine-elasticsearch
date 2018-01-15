@@ -3,6 +3,10 @@ declare(strict_types=1);
 
 namespace Understeam\LumenDoctrineElasticsearch\Search;
 
+use Illuminate\Contracts\Container\Container;
+use Understeam\LumenDoctrineElasticsearch\Search\Hits\HitsCollectionContract;
+use Understeam\LumenDoctrineElasticsearch\Search\Suggest\SuggestCollectionContract;
+
 /**
  * Class SearchResult
  *
@@ -10,34 +14,48 @@ namespace Understeam\LumenDoctrineElasticsearch\Search;
  */
 class SearchResult implements SearchResultContract
 {
-    /**
-     * @var int
-     */
-    protected $total;
-    /**
-     * @var array
-     */
-    protected $items;
 
-    public function __construct(int $total, array $items)
+    /**
+     * @var null|SuggestCollectionContract
+     */
+    protected $suggestions;
+
+    /**
+     * @var null|HitsCollectionContract
+     */
+    protected $hits;
+
+    public function __construct(Container $container, array $data)
     {
-        $this->total = $total;
-        $this->items = $items;
+        if (isset($data['hits'])) {
+            $this->hits = $container->make(HitsCollectionContract::class, [
+                'data' => $data['hits'],
+            ]);
+        }
+
+        if (isset($data['suggest'])) {
+            $this->suggestions = $container->make(SuggestCollectionContract::class, [
+                'container' => $container,
+                'data' => $data['suggest'],
+            ]);
+        }
     }
 
     /**
-     * @return int
+     * Returns suggestions
+     * @return null|SuggestCollectionContract
      */
-    public function getTotal(): int
+    public function getSuggestions(): ?SuggestCollectionContract
     {
-        return $this->total;
+        return $this->suggestions;
     }
 
     /**
-     * @return array
+     * Returns hits total count
+     * @return null|HitsCollectionContract
      */
-    public function getItems(): array
+    public function getHits(): ?HitsCollectionContract
     {
-        return $this->items;
+        return $this->hits;
     }
 }

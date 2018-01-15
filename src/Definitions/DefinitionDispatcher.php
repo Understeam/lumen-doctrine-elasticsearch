@@ -4,7 +4,9 @@ declare(strict_types=1);
 namespace Understeam\LumenDoctrineElasticsearch\Definitions;
 
 use Doctrine\Common\Util\ClassUtils;
+use Illuminate\Contracts\Container\Container;
 use Understeam\LumenDoctrineElasticsearch\Doctrine\SearchableRepositoryContract;
+use Understeam\LumenDoctrineElasticsearch\Search\EngineContract;
 
 /**
  * Class DefinitionManager
@@ -28,16 +30,18 @@ class DefinitionDispatcher implements DefinitionDispatcherContract
      * @var IndexDefinitionContract[]
      */
     protected $repositoryMap = [];
+    /**
+     * @var Container
+     */
+    protected $container;
 
     /**
      * DefinitionDispatcher constructor.
-     * @param IndexDefinitionContract[] $repositories
+     * @param Container $container
      */
-    public function __construct(array $repositories = [])
+    public function __construct(Container $container)
     {
-        foreach ($repositories as $repository) {
-            $this->addRepository($repository);
-        }
+        $this->container = $container;
     }
 
     /**
@@ -71,10 +75,10 @@ class DefinitionDispatcher implements DefinitionDispatcherContract
     /**
      * @inheritdoc
      */
-    public function addRepository(SearchableRepositoryContract $repository): void
+    public function addRepository(string $repositoryClass): void
     {
-        $definition = $this->createDefinition($repository->getIndexDefinitionClass());
-        $this->repositoryMap[get_class($repository)] = $definition;
+        $definition = $this->createDefinition($repositoryClass::getIndexDefinitionClass());
+        $this->repositoryMap[$repositoryClass] = $definition;
         $this->definitions[get_class($definition)] = $definition;
         $this->entityMap[$definition->getEntityClass()][] = $definition;
     }
@@ -85,7 +89,7 @@ class DefinitionDispatcher implements DefinitionDispatcherContract
      */
     protected function createDefinition(string $class): IndexDefinitionContract
     {
-        return new $class;
+        return $this->container->make($class);
     }
 
     /**
@@ -114,6 +118,16 @@ class DefinitionDispatcher implements DefinitionDispatcherContract
             $entityClass = ClassUtils::getClass($entityClass);
         }
         return !empty($this->entityMap[$entityClass]);
+    }
+
+    public function getEngine(SearchableRepositoryContract $repository): EngineContract
+    {
+        $definition = $this->getRepositoryDefinition(get_class($repository));
+        return $this->container->make(EngineContract::class, [
+            'container' => $this->container,
+            'definition' => $definition,
+            'repository' => $repository,
+        ]);
     }
 
 }

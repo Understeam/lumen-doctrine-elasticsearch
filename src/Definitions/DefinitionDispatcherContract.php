@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace Understeam\LumenDoctrineElasticsearch\Definitions;
 
 use Understeam\LumenDoctrineElasticsearch\Doctrine\SearchableRepositoryContract;
+use Understeam\LumenDoctrineElasticsearch\Search\EngineContract;
 
 /**
  * Interface DefinitionDispatcherContract
@@ -28,9 +29,9 @@ interface DefinitionDispatcherContract
 
     /**
      * Adds definition instance to dispatcher
-     * @param SearchableRepositoryContract $repository
+     * @param string|IndexDefinitionContract $repositoryClass
      */
-    public function addRepository(SearchableRepositoryContract $repository): void;
+    public function addRepository(string $repositoryClass): void;
 
     /**
      * Returns array of definitions associated with given entity
@@ -58,5 +59,12 @@ interface DefinitionDispatcherContract
      * @return string[]
      */
     public function getRepositoryClasses(): array;
+
+    /**
+     * Creates Engine for given repository
+     * @param SearchableRepositoryContract $repository
+     * @return EngineContract
+     */
+    public function getEngine(SearchableRepositoryContract $repository): EngineContract;
 
 }
