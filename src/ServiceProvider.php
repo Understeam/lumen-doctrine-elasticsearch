@@ -12,18 +12,12 @@ use Understeam\LumenDoctrineElasticsearch\Commands\ImportCommand;
 use Understeam\LumenDoctrineElasticsearch\Commands\MigrateAllCommand;
 use Understeam\LumenDoctrineElasticsearch\Search\Engine;
 use Understeam\LumenDoctrineElasticsearch\Search\EngineContract;
-use Understeam\LumenDoctrineElasticsearch\Search\EngineManager;
-use Understeam\LumenDoctrineElasticsearch\Search\EngineManagerContract;
 use Understeam\LumenDoctrineElasticsearch\Search\Hits\HitsCollection;
 use Understeam\LumenDoctrineElasticsearch\Search\Hits\HitsCollectionContract;
 use Understeam\LumenDoctrineElasticsearch\Search\SearchResult;
 use Understeam\LumenDoctrineElasticsearch\Search\SearchResultContract;
-use Understeam\LumenDoctrineElasticsearch\Search\Suggest\Suggest;
-use Understeam\LumenDoctrineElasticsearch\Search\Suggest\SuggestContract;
 use Understeam\LumenDoctrineElasticsearch\Search\Suggest\SuggestCollection;
 use Understeam\LumenDoctrineElasticsearch\Search\Suggest\SuggestCollectionContract;
-use Understeam\LumenDoctrineElasticsearch\Search\Suggest\SuggestOption;
-use Understeam\LumenDoctrineElasticsearch\Search\Suggest\SuggestOptionContract;
 
 /**
  * Class ServiceProvider
@@ -56,7 +50,6 @@ class ServiceProvider extends \Illuminate\Support\ServiceProvider
     protected function registerEngineManager()
     {
         $this->app->bind(EngineContract::class, Engine::class);
-        $this->app->bind(EngineManagerContract::class, EngineManager::class, true);
     }
 
     protected function registerIndexer()
@@ -74,8 +67,6 @@ class ServiceProvider extends \Illuminate\Support\ServiceProvider
         $this->app->bind(SearchResultContract::class, SearchResult::class);
         $this->app->bind(HitsCollectionContract::class, HitsCollection::class);
         $this->app->bind(SuggestCollectionContract::class, SuggestCollection::class);
-        $this->app->bind(SuggestContract::class, Suggest::class);
-        $this->app->bind(SuggestOptionContract::class, SuggestOption::class);
     }
 
     protected function registerDefinitions($repositories)
@@ -108,8 +99,6 @@ class ServiceProvider extends \Illuminate\Support\ServiceProvider
             SearchResultContract::class,
             HitsCollectionContract::class,
             SuggestCollectionContract::class,
-            SuggestContract::class,
-            SuggestOptionContract::class,
         ];
     }
 }
