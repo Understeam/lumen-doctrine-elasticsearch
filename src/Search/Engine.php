@@ -8,6 +8,7 @@ use Nord\Lumen\Elasticsearch\Contracts\ElasticsearchServiceContract;
 use ONGR\ElasticsearchDSL\Search;
 use Understeam\LumenDoctrineElasticsearch\Definitions\IndexDefinitionContract;
 use Understeam\LumenDoctrineElasticsearch\Doctrine\SearchableRepositoryContract;
+use Understeam\LumenDoctrineElasticsearch\Search\Aggs\AggsCollectionContract;
 use Understeam\LumenDoctrineElasticsearch\Search\Suggest\SuggestCollectionContract;
 
 /**
@@ -98,5 +99,14 @@ class Engine implements EngineContract
     {
         $result = $this->executeSearch($query);
         return $result->getSuggestions();
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function aggregate(Search $query): ?AggsCollectionContract
+    {
+        $result = $this->executeSearch($query);
+        return $result->getAggs();
     }
 }

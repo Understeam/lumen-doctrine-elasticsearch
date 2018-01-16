@@ -5,6 +5,7 @@ namespace Understeam\LumenDoctrineElasticsearch\Search;
 
 use ONGR\ElasticsearchDSL\Search;
 use Understeam\LumenDoctrineElasticsearch\Doctrine\SearchableRepositoryContract;
+use Understeam\LumenDoctrineElasticsearch\Search\Aggs\AggsCollectionContract;
 use Understeam\LumenDoctrineElasticsearch\Search\Suggest\SuggestCollectionContract;
 
 /**
@@ -23,13 +24,6 @@ interface EngineContract
     public function mapHits(array $hits): array;
 
     /**
-     * Executes search in given repository
-     * @param Search $query search request
-     * @return object[] found entities
-     */
-    public function search(Search $query): array;
-
-    /**
      * Executes any search request
      * @param Search $query
      * @return SearchResultContract search result
@@ -37,9 +31,23 @@ interface EngineContract
     public function executeSearch(Search $query): SearchResultContract;
 
     /**
-     * Executes suggest request
+     * Executes search request and returns found hits
+     * @param Search $query search request
+     * @return object[] found entities
+     */
+    public function search(Search $query): array;
+
+    /**
+     * Executes search request and returns suggestions
      * @param Search $query
      * @return null|SuggestCollectionContract suggest collection
      */
     public function suggest(Search $query): ?SuggestCollectionContract;
+
+    /**
+     * Executes search request and returns aggregations
+     * @param Search $query
+     * @return null|AggsCollectionContract suggest collection
+     */
+    public function aggregate(Search $query): ?AggsCollectionContract;
 }
