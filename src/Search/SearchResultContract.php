@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace Understeam\LumenDoctrineElasticsearch\Search;
 
+use Understeam\LumenDoctrineElasticsearch\Search\Aggs\AggsCollectionContract;
 use Understeam\LumenDoctrineElasticsearch\Search\Hits\HitsCollectionContract;
 use Understeam\LumenDoctrineElasticsearch\Search\Suggest\SuggestCollectionContract;
 
@@ -25,5 +26,11 @@ interface SearchResultContract
      * @return null|SuggestCollectionContract
      */
     public function getSuggestions(): ?SuggestCollectionContract;
+
+    /**
+     * Returns suggestions
+     * @return null|AggsCollectionContract
+     */
+    public function getAggs(): ?AggsCollectionContract;
 
 }

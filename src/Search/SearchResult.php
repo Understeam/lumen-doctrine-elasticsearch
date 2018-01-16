@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace Understeam\LumenDoctrineElasticsearch\Search;
 
 use Illuminate\Contracts\Container\Container;
+use Understeam\LumenDoctrineElasticsearch\Search\Aggs\AggsCollectionContract;
 use Understeam\LumenDoctrineElasticsearch\Search\Hits\HitsCollectionContract;
 use Understeam\LumenDoctrineElasticsearch\Search\Suggest\SuggestCollectionContract;
 
@@ -19,11 +20,14 @@ class SearchResult implements SearchResultContract
      * @var null|SuggestCollectionContract
      */
     protected $suggestions;
-
     /**
      * @var null|HitsCollectionContract
      */
     protected $hits;
+    /**
+     * @var null|AggsCollectionContract
+     */
+    protected $aggs;
 
     public function __construct(Container $container, array $data)
     {
@@ -37,6 +41,13 @@ class SearchResult implements SearchResultContract
             $this->suggestions = $container->make(SuggestCollectionContract::class, [
                 'container' => $container,
                 'data' => $data['suggest'],
+            ]);
+        }
+
+        if (isset($data['aggregations'])) {
+            $this->aggs = $container->make(AggsCollectionContract::class, [
+                'container' => $container,
+                'data' => $data['aggregations'],
             ]);
         }
     }
@@ -57,5 +68,14 @@ class SearchResult implements SearchResultContract
     public function getHits(): ?HitsCollectionContract
     {
         return $this->hits;
+    }
+
+    /**
+     * Returns suggestions
+     * @return null|AggsCollectionContract
+     */
+    public function getAggs(): ?AggsCollectionContract
+    {
+        return $this->aggs;
     }
 }

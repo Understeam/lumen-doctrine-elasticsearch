@@ -10,6 +10,8 @@ use Understeam\LumenDoctrineElasticsearch\Indexer\Indexer;
 use Understeam\LumenDoctrineElasticsearch\Indexer\IndexerContract;
 use Understeam\LumenDoctrineElasticsearch\Commands\ImportCommand;
 use Understeam\LumenDoctrineElasticsearch\Commands\MigrateAllCommand;
+use Understeam\LumenDoctrineElasticsearch\Search\Aggs\AggsCollection;
+use Understeam\LumenDoctrineElasticsearch\Search\Aggs\AggsCollectionContract;
 use Understeam\LumenDoctrineElasticsearch\Search\Engine;
 use Understeam\LumenDoctrineElasticsearch\Search\EngineContract;
 use Understeam\LumenDoctrineElasticsearch\Search\Hits\HitsCollection;
@@ -67,6 +69,7 @@ class ServiceProvider extends \Illuminate\Support\ServiceProvider
         $this->app->bind(SearchResultContract::class, SearchResult::class);
         $this->app->bind(HitsCollectionContract::class, HitsCollection::class);
         $this->app->bind(SuggestCollectionContract::class, SuggestCollection::class);
+        $this->app->bind(AggsCollectionContract::class, AggsCollection::class);
     }
 
     protected function registerDefinitions($repositories)
@@ -99,6 +102,7 @@ class ServiceProvider extends \Illuminate\Support\ServiceProvider
             SearchResultContract::class,
             HitsCollectionContract::class,
             SuggestCollectionContract::class,
+            AggsCollectionContract::class,
         ];
     }
 }
