@@ -30,6 +30,7 @@ class Indexer implements IndexerContract
 
     /**
      * @inheritdoc
+     * @throws IndexingException
      */
     public function updateEntities(IndexDefinitionContract $definition, array $entities): void
     {
@@ -59,13 +60,12 @@ class Indexer implements IndexerContract
                 ];
             }
         }
-        if (count($bulk)) {
-            $this->es->bulk(['body' => $bulk]);
-        }
+        $this->executeBulk($bulk);
     }
 
     /**
      * @inheritdoc
+     * @throws IndexingException
      */
     public function deleteEntities(IndexDefinitionContract $definition, array $entities): void
     {
@@ -79,8 +79,21 @@ class Indexer implements IndexerContract
                 ]
             ];
         }
-        if ($bulk) {
-            $this->es->bulk(['body' => $bulk]);
+        $this->executeBulk($bulk);
+    }
+
+    /**
+     * @param array $bulk
+     * @throws IndexingException
+     */
+    protected function executeBulk(array $bulk)
+    {
+        if (count($bulk)) {
+            $result = $this->es->bulk(['body' => $bulk]);
+            if ($result['errors'] > 0) {
+                $json = json_encode($result, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+                throw new IndexingException("Could not execute bulk request: {$result['errors']} errors detected.\n{$json}");
+            }
         }
     }
 }

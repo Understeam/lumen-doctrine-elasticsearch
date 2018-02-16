@@ -66,6 +66,17 @@ class MigrationRunner
         ];
     }
 
+    protected function getDocumentMethodSignature(IndexDefinitionContract $definition)
+    {
+        $class = new \ReflectionClass($definition);
+        $method = $class->getMethod('getDocument');
+        $start = $method->getStartLine();
+        $end = $method->getEndLine();
+        $file = $class->getFileName();
+        $lines = array_slice(file($file), $start, $end - $start);
+        return sha1(trim(implode("\n", $lines)));
+    }
+
     protected function getMappingMeta(IndexDefinitionContract $definition)
     {
         return [
@@ -74,6 +85,7 @@ class MigrationRunner
             'entityClass' => $definition->getEntityClass(),
             'mappings' => serialize($definition->getMapping()),
             'settings' => serialize($definition->getSettings()),
+            'signature' => $this->getDocumentMethodSignature($definition),
         ];
     }
 
@@ -110,11 +122,16 @@ class MigrationRunner
         if ($meta === null) {
             throw new \Exception("Index {$realName} was not created by this migrations. Delete or rename index to continue");
         }
+        if (!isset($meta['signature']) || $meta['signature'] != $this->getDocumentMethodSignature($definition)) {
+            // getDocument() method was changed
+            return self::STATE_REIMPORT_REQUIRED;
+        }
         $originalMappings = unserialize($meta['mappings']);
         if ($originalMappings !== $definition->getMapping()) {
             // Mapping was changed
             return self::STATE_REIMPORT_REQUIRED;
         }
+
         $originalSettings = unserialize($meta['settings']);
         if ($originalSettings !== $definition->getSettings()) {
             if ($this->wasStaticSettingsChanged($originalSettings, $definition->getSettings())) {
