@@ -60,7 +60,7 @@ class Indexer implements IndexerContract
                 ];
             }
         }
-        $this->executeBulk($bulk);
+        $this->executeBulk($definition, $bulk);
     }
 
     /**
@@ -79,14 +79,15 @@ class Indexer implements IndexerContract
                 ]
             ];
         }
-        $this->executeBulk($bulk);
+        $this->executeBulk($definition, $bulk);
     }
 
     /**
+     * @param IndexDefinitionContract $definition
      * @param array $bulk
      * @throws IndexingException
      */
-    protected function executeBulk(array $bulk)
+    protected function executeBulk(IndexDefinitionContract $definition, array $bulk)
     {
         if (count($bulk)) {
             $result = $this->es->bulk(['body' => $bulk]);
@@ -94,6 +95,7 @@ class Indexer implements IndexerContract
                 $json = json_encode($result, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
                 throw new IndexingException("Could not execute bulk request: {$result['errors']} errors detected.\n{$json}");
             }
+            $this->es->indices()->refresh(['index' => $definition->getIndexAlias()]);
         }
     }
 }
