@@ -5,7 +5,7 @@
     "require": {
         "php": ">=7.2",
         "laravel-doctrine/orm": "^1.4",
-        "nordsoftware/lumen-elasticsearch": "^2.3",
+        "nordsoftware/lumen-elasticsearch": "2.3.6",
         "ongr/elasticsearch-dsl": "^5.1"
     },
     "require-dev": {
