@@ -70,8 +70,9 @@ class ImportCommand extends Command
             $this->error("Repository '{$repositoryClass}' should implement " . SearchableRepositoryContract::class);
             return 1;
         }
-        $repository->batch(function ($entities) use ($definition) {
+        $repository->batch(function ($entities) use ($repository, $definition) {
             $this->indexer->updateEntities($definition, $entities);
+            $repository->clear();
         });
         return 0;
     }

@@ -65,4 +65,13 @@ class TestRepository implements SearchableRepositoryContract
     {
         return TestIndexDefinition::class;
     }
+
+    /**
+     * Clears the repository, causing all managed entities to become detached.
+     *
+     * @return void
+     */
+    public function clear()
+    {
+    }
 }

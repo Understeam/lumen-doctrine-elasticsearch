@@ -31,4 +31,11 @@ interface SearchableRepositoryContract
      */
     public static function getIndexDefinitionClass(): string;
 
+    /**
+     * Clears the repository, causing all managed entities to become detached.
+     *
+     * @return void
+     */
+    public function clear();
+
 }
